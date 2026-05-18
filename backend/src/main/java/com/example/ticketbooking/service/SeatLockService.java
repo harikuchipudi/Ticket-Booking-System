@@ -87,10 +87,28 @@ public class SeatLockService {
         emitter.onTimeout(onDisconnect);
         emitter.onError(e -> onDisconnect.run());
 
-        // 1. Send DB-persisted booked seats for this match
-        ticketRepository.findByMatchName(matchName).forEach(ticket ->
-            sendToEmitter(new SeatLockEvent(matchName, ticket.getSeat(), ticket.getUserId(), "booked"), emitter)
-        );
+        // 1. Send DB-persisted booked seats for this match (optimized with Redis caching)
+        String cacheKey = "stadium:booked:" + matchName;
+        Map<Object, Object> cachedSeats = redisTemplate.opsForHash().entries(cacheKey);
+
+        if (cachedSeats == null || cachedSeats.isEmpty()) {
+            // Cache miss: load from DB
+            List<com.example.ticketbooking.model.Ticket> tickets = ticketRepository.findByMatchName(matchName);
+            if (!tickets.isEmpty()) {
+                Map<String, String> cacheMap = new java.util.HashMap<>();
+                tickets.forEach(ticket -> {
+                    cacheMap.put(ticket.getSeat(), ticket.getUserId());
+                    sendToEmitter(new SeatLockEvent(matchName, ticket.getSeat(), ticket.getUserId(), "booked"), emitter);
+                });
+                redisTemplate.opsForHash().putAll(cacheKey, cacheMap);
+                redisTemplate.expire(cacheKey, Duration.ofHours(24));
+            }
+        } else {
+            // Cache hit: serve from Redis
+            cachedSeats.forEach((seat, user) -> 
+                sendToEmitter(new SeatLockEvent(matchName, seat.toString(), user.toString(), "booked"), emitter)
+            );
+        }
 
         // 2. Overlay current Redis locks for this match
         String matchPrefix = LOCK_PREFIX + matchName + ":";
@@ -148,9 +166,23 @@ public class SeatLockService {
         }
     }
 
-    public void releaseAndBroadcastBooked(String matchName, String seatId, String userId) {
+    /**
+     * Called by the OutboxProcessor. Guarantees that locks are released,
+     * cache is updated, and SSE events are broadcast exactly once per booking.
+     */
+    public void processBookedEvent(SeatLockEvent event) {
+        String matchName = event.getMatchName();
+        String seatId = event.getSeatId();
+        
+        // 1. Delete lock
         redisTemplate.delete(LOCK_PREFIX + matchName + ":" + seatId);
-        publishEvent(new SeatLockEvent(matchName, seatId, userId, "booked"));
+        
+        // 2. Update cache
+        String cacheKey = "stadium:booked:" + matchName;
+        redisTemplate.opsForHash().put(cacheKey, seatId, event.getUserId());
+        
+        // 3. Broadcast
+        publishEvent(event);
     }
 
     // ── Redis Pub/Sub + SSE ───────────────────────────────────────────────────

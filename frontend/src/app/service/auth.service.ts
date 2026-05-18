@@ -4,8 +4,9 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { concatMap, tap } from 'rxjs/operators';
 import { User, AuthRequest, AuthResponse } from '../models/user';
 import { SeatService } from './SeatService';
+import { environment } from '../../environments/environment';
 
-const API = 'http://localhost:8082';
+const API = environment.apiUrl;
 const TOKEN_KEY = 'ticket_jwt';
 
 /**

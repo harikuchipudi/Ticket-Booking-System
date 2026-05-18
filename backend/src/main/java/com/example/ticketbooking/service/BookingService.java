@@ -34,6 +34,8 @@ public class BookingService {
     private final TicketRepository    ticketRepository;
     private final SeatLockService     seatLockService;
     private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+    private final com.example.ticketbooking.repository.OutboxEventRepository outboxEventRepository;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     private final Counter bookingConfirmedCounter;
     private final Counter bookingRejectedCounter;
@@ -41,10 +43,13 @@ public class BookingService {
     public BookingService(TicketRepository ticketRepository,
                           SeatLockService seatLockService,
                           org.springframework.data.redis.core.StringRedisTemplate redisTemplate,
+                          com.example.ticketbooking.repository.OutboxEventRepository outboxEventRepository,
                           MeterRegistry meterRegistry) {
         this.ticketRepository = ticketRepository;
         this.seatLockService  = seatLockService;
         this.redisTemplate    = redisTemplate;
+        this.outboxEventRepository = outboxEventRepository;
+        this.objectMapper     = new com.fasterxml.jackson.databind.ObjectMapper();
 
         this.bookingConfirmedCounter = Counter.builder("booking.confirmed")
                 .description("Successfully persisted bookings")
@@ -107,9 +112,18 @@ public class BookingService {
             throw new SeatAlreadyBookedException("Seat " + seatId + " was just booked by another user.");
         }
 
-        // ── Step 4 & 5: Release Redis lock and broadcast SSE event ────────────
-        // These happen AFTER the DB commit succeeds (method is @Transactional).
-        seatLockService.releaseAndBroadcastBooked(matchName, seatId, userId);
+        // ── Step 4 & 5: Save OutboxEvent for background processing ────────────
+        // This solves the dual-write problem. The background processor will guarantee
+        // that the Redis lock is deleted and the SSE broadcast is sent.
+        try {
+            com.example.ticketbooking.model.SeatLockEvent event = 
+                new com.example.ticketbooking.model.SeatLockEvent(matchName, seatId, userId, "booked");
+            String payload = objectMapper.writeValueAsString(event);
+            outboxEventRepository.save(new com.example.ticketbooking.model.OutboxEvent(matchName + ":" + seatId, "SEAT_BOOKED", payload));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.error("Failed to serialize OutboxEvent payload", e);
+            throw new RuntimeException("Failed to save outbox event", e);
+        }
 
         return saved;
     }

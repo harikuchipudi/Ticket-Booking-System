@@ -1,6 +1,7 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Subject, Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface SeatLockMessage {
   matchName: string;
@@ -9,7 +10,7 @@ export interface SeatLockMessage {
   status: 'locked' | 'available' | 'booked';
 }
 
-const API = 'http://localhost:8082';
+const API = environment.apiUrl;
 
 /**
  * Manages the SSE stream for real-time seat updates and REST calls for

@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { AuthService } from '../service/auth.service';
 import { HttpClient } from '@angular/common/http';
 import { User } from '../models/user';
+import { environment } from '../../environments/environment';
 
 interface BookedTicket {
   id: number;
@@ -13,7 +14,7 @@ interface BookedTicket {
   bookedAt: string;
 }
 
-const API = 'http://localhost:8082';
+const API = environment.apiUrl;
 
 /**
  * Refactored from a manual booking form to a "My Bookings" panel.

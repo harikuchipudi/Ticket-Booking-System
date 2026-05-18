@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
 export interface Match {
   id: string;
@@ -19,11 +20,12 @@ export interface Match {
 export class MatchesComponent implements OnInit {
   matches: Match[] = [];
   loading = true;
+  private API = environment.apiUrl;
 
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
-    this.http.get<Match[]>('http://localhost:8082/api/matches').subscribe({
+    this.http.get<Match[]>(`${this.API}/api/matches`).subscribe({
       next: (data) => {
         this.matches = data;
         this.loading = false;
