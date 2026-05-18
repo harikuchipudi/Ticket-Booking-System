@@ -1,8 +1,18 @@
 <div class="matches-container">
   <header class="matches-header">
     <div class="logo">🏟️ StadiumX</div>
-    <h1>Premier League Tickets</h1>
-    <p>Select a match to book your seats in real-time.</p>
+    <div class="header-center">
+      <h1>Premier League Tickets</h1>
+      <p>Select a match to book your seats in real-time.</p>
+    </div>
+    <div class="header-nav">
+      <button class="nav-btn" routerLink="/booking">
+        <span class="icon">👤</span> My Bookings
+      </button>
+      <button class="nav-btn logout-btn" (click)="logout()">
+        <span class="icon">🚪</span> Logout
+      </button>
+    </div>
   </header>
 
   <div class="loading-state" *ngIf="loading">

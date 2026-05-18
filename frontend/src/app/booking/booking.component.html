@@ -1,5 +1,9 @@
 <div class="booking-panel">
-
+  <div class="nav-header" style="margin-bottom: 20px;">
+    <button class="nav-btn back-btn" routerLink="/matches" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #f8fafc; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+      <span class="icon">⬅️</span> Back to Matches
+    </button>
+  </div>
   <!-- User header -->
   <div class="user-header" *ngIf="user">
     <div class="avatar">{{ user.displayName[0] | uppercase }}</div>

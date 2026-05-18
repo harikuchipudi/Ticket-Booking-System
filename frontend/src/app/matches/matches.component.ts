@@ -12,6 +12,9 @@ export interface Match {
   status: string;
 }
 
+import { Router } from '@angular/router';
+import { AuthService } from '../service/auth.service';
+
 @Component({
   selector: 'app-matches',
   templateUrl: './matches.component.html',
@@ -22,7 +25,16 @@ export class MatchesComponent implements OnInit {
   loading = true;
   private API = environment.apiUrl;
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private authService: AuthService,
+    private router: Router
+  ) {}
+
+  logout() {
+    this.authService.logout();
+    this.router.navigate(['/login']);
+  }
 
   ngOnInit() {
     this.http.get<Match[]>(`${this.API}/api/matches`).subscribe({
