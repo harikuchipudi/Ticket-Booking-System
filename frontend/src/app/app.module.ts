@@ -17,6 +17,7 @@ import { MatchesComponent } from './matches/matches.component';
 const routes: Routes = [
   { path: 'login',   component: AuthComponent },
   { path: 'matches', component: MatchesComponent, canActivate: [AuthGuard] },
+  { path: 'booking', component: BookingComponent, canActivate: [AuthGuard] },
   { path: 'stadium/:matchName', component: StadiumComponent, canActivate: [AuthGuard] },
   { path: '',        redirectTo: 'matches', pathMatch: 'full' },
   { path: '**',      redirectTo: 'matches' }
