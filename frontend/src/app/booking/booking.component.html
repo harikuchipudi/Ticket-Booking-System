@@ -19,21 +19,23 @@
     <button class="refresh-btn" (click)="loadTickets()" title="Refresh">↻</button>
   </div>
 
-  <div class="tickets-list" *ngIf="tickets.length > 0">
-    <div class="ticket-card" *ngFor="let t of tickets">
-      <div class="ticket-seat">{{ t.seat }}</div>
-      <div class="ticket-details">
-        <div class="ticket-match">{{ t.matchName }}</div>
-        <div class="ticket-meta">{{ t.customerName }}</div>
+  <div class="scroll-area">
+    <div class="tickets-list" *ngIf="tickets.length > 0">
+      <div class="ticket-card" *ngFor="let t of tickets">
+        <div class="ticket-seat">{{ t.seat }}</div>
+        <div class="ticket-details">
+          <div class="ticket-match">{{ t.matchName }}</div>
+          <div class="ticket-meta">{{ t.customerName }}</div>
+        </div>
+        <span class="ticket-status">✓</span>
       </div>
-      <span class="ticket-status">✓</span>
     </div>
-  </div>
 
-  <div class="empty-state" *ngIf="tickets.length === 0">
-    <div class="empty-icon">🏟️</div>
-    <p>No bookings yet</p>
-    <span>Select seats from the stadium map →</span>
+    <div class="empty-state" *ngIf="tickets.length === 0">
+      <div class="empty-icon">🏟️</div>
+      <p>No bookings yet</p>
+      <span>Select seats from the stadium map →</span>
+    </div>
   </div>
 
 </div>

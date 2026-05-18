@@ -37,9 +37,12 @@ public class SecurityConfig {
             .authorizeHttpRequests()
                 // Auth endpoints are open
                 .antMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
+                // Match list is open
+                .antMatchers(HttpMethod.GET, "/api/matches").permitAll()
                 // SSE stream is open (browser EventSource can't set headers)
-                .antMatchers(HttpMethod.GET, "/api/seats/stream").permitAll()
-                .antMatchers(HttpMethod.GET, "/api/tickets/health").permitAll()
+                .antMatchers(HttpMethod.GET, "/api/seats/**/stream").permitAll()
+                // Actuator — health + prometheus (allow internal monitoring without JWT)
+                .antMatchers("/actuator/**").permitAll()
                 // Everything else requires a valid JWT
                 .anyRequest().authenticated()
             .and()

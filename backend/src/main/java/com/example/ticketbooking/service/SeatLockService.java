@@ -2,8 +2,13 @@ package com.example.ticketbooking.service;
 
 import com.example.ticketbooking.config.RedisConfig;
 import com.example.ticketbooking.model.SeatLockEvent;
+import com.example.ticketbooking.repository.TicketRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -13,159 +18,171 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Manages seat locks using Redis for centralized state and Pub/Sub for broadcasting.
+ * Manages real-time seat locking via Redis and SSE broadcasting.
  */
-import com.example.ticketbooking.repository.TicketRepository;
-
 @Service
 public class SeatLockService {
 
     private static final Logger log = LoggerFactory.getLogger(SeatLockService.class);
-    private static final long LOCK_TTL_SECONDS = 5 * 60; // 5 minutes
-    private static final String LOCK_PREFIX = "seat:lock:";
+    private static final long   LOCK_TTL_SECONDS = 5 * 60;
+    private static final String LOCK_PREFIX      = "seat:lock:"; // We'll append matchName:seatId
 
     private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
-    private final TicketRepository ticketRepository;
+    private final ObjectMapper        objectMapper;
+    private final TicketRepository    ticketRepository;
 
-    // Emitters for clients connected specifically to this backend instance
-    private final List<SseEmitter> localEmitters = new CopyOnWriteArrayList<>();
+    // Group emitters by matchName to avoid broadcasting irrelevant events
+    private final Map<String, List<SseEmitter>> matchEmitters = new ConcurrentHashMap<>();
 
-    public SeatLockService(StringRedisTemplate redisTemplate, TicketRepository ticketRepository) {
+    // ── Metrics ──────────────────────────────────────────────────────────────
+    private final Counter lockSuccessCounter;
+    private final Counter lockConflictCounter;
+    private final Counter lockRefreshCounter;
+
+    public SeatLockService(StringRedisTemplate redisTemplate,
+                           TicketRepository ticketRepository,
+                           MeterRegistry meterRegistry) {
         this.redisTemplate    = redisTemplate;
         this.ticketRepository = ticketRepository;
         this.objectMapper     = new ObjectMapper();
+
+        this.lockSuccessCounter  = Counter.builder("seat.lock.attempts")
+                .tag("result", "success")
+                .register(meterRegistry);
+        this.lockConflictCounter = Counter.builder("seat.lock.attempts")
+                .tag("result", "conflict")
+                .register(meterRegistry);
+        this.lockRefreshCounter  = Counter.builder("seat.lock.attempts")
+                .tag("result", "refresh")
+                .register(meterRegistry);
+
+        Gauge.builder("sse.active.connections", matchEmitters, m -> m.values().stream().mapToInt(List::size).sum())
+                .description("Total active SSE connections across all matches")
+                .register(meterRegistry);
     }
 
+    // ── SSE lifecycle ─────────────────────────────────────────────────────────
 
-    // ──────────────────────────────────────────────
-    //  SSE connection management
-    // ──────────────────────────────────────────────
-
-    public SseEmitter subscribe() {
+    public SseEmitter subscribe(String matchName) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
-        localEmitters.add(emitter);
+        matchEmitters.computeIfAbsent(matchName, k -> new CopyOnWriteArrayList<>()).add(emitter);
 
-        emitter.onCompletion(() -> localEmitters.remove(emitter));
-        emitter.onTimeout(() -> localEmitters.remove(emitter));
-        emitter.onError(e -> localEmitters.remove(emitter));
+        Runnable onDisconnect = () -> {
+            List<SseEmitter> list = matchEmitters.get(matchName);
+            if (list != null) {
+                list.remove(emitter);
+                if (list.isEmpty()) {
+                    matchEmitters.remove(matchName);
+                }
+            }
+        };
 
-        // 1. Emit DB-persisted booked seats FIRST (permanent state, survives restarts)
-        ticketRepository.findAll().forEach(ticket ->
-            sendToEmitter(new SeatLockEvent(ticket.getSeat(), ticket.getUserId(), "booked"), emitter)
+        emitter.onCompletion(onDisconnect);
+        emitter.onTimeout(onDisconnect);
+        emitter.onError(e -> onDisconnect.run());
+
+        // 1. Send DB-persisted booked seats for this match
+        ticketRepository.findByMatchName(matchName).forEach(ticket ->
+            sendToEmitter(new SeatLockEvent(matchName, ticket.getSeat(), ticket.getUserId(), "booked"), emitter)
         );
 
-        // 2. Overlay current Redis locks (transient — these may expire)
-        Set<String> keys = redisTemplate.keys(LOCK_PREFIX + "*");
+        // 2. Overlay current Redis locks for this match
+        String matchPrefix = LOCK_PREFIX + matchName + ":";
+        Set<String> keys = redisTemplate.keys(matchPrefix + "*");
         if (keys != null) {
             keys.forEach(key -> {
-                String seatId = key.substring(LOCK_PREFIX.length());
+                String seatId = key.substring(matchPrefix.length());
                 String userId = redisTemplate.opsForValue().get(key);
                 if (userId != null) {
-                    sendToEmitter(new SeatLockEvent(seatId, userId, "locked"), emitter);
+                    sendToEmitter(new SeatLockEvent(matchName, seatId, userId, "locked"), emitter);
                 }
             });
         }
-
         return emitter;
     }
 
-    // ──────────────────────────────────────────────
-    //  Lock / Unlock / Book operations
-    // ──────────────────────────────────────────────
+    // ── Locking operations ────────────────────────────────────────────────────
 
-    public boolean lock(String seatId, String userId) {
-        String key = LOCK_PREFIX + seatId;
-        
-        // setIfAbsent behaves like a distributed lock
+    @CircuitBreaker(name = "redis", fallbackMethod = "lockFallback")
+    public boolean lock(String matchName, String seatId, String userId) {
+        String  key      = LOCK_PREFIX + matchName + ":" + seatId;
         Boolean acquired = redisTemplate.opsForValue()
                 .setIfAbsent(key, userId, Duration.ofSeconds(LOCK_TTL_SECONDS));
 
         if (Boolean.TRUE.equals(acquired)) {
-            publishEvent(new SeatLockEvent(seatId, userId, "locked"));
+            lockSuccessCounter.increment();
+            publishEvent(new SeatLockEvent(matchName, seatId, userId, "locked"));
             return true;
         }
 
-        // If not acquired, check if we already own it
-        String existingUserId = redisTemplate.opsForValue().get(key);
-        if (userId.equals(existingUserId)) {
-            // Refresh TTL
+        String existingOwner = redisTemplate.opsForValue().get(key);
+        if (userId.equals(existingOwner)) {
             redisTemplate.expire(key, Duration.ofSeconds(LOCK_TTL_SECONDS));
+            lockRefreshCounter.increment();
             return true;
         }
 
+        lockConflictCounter.increment();
         return false;
     }
 
-    public void unlock(String seatId, String userId) {
-        String key = LOCK_PREFIX + seatId;
-        String existingUserId = redisTemplate.opsForValue().get(key);
-        
-        if (userId.equals(existingUserId)) {
+    public boolean lockFallback(String matchName, String seatId, String userId, Throwable t) {
+        log.error("Redis circuit OPEN — lock rejected for match={} seat={} user={}: {}", matchName, seatId, userId, t.getMessage());
+        lockConflictCounter.increment();
+        return false;
+    }
+
+    public void unlock(String matchName, String seatId, String userId) {
+        String key           = LOCK_PREFIX + matchName + ":" + seatId;
+        String existingOwner = redisTemplate.opsForValue().get(key);
+
+        if (userId.equals(existingOwner)) {
             redisTemplate.delete(key);
-            publishEvent(new SeatLockEvent(seatId, userId, "available"));
+            publishEvent(new SeatLockEvent(matchName, seatId, userId, "available"));
         }
     }
 
-    /**
-     * Called by {@link BookingService} AFTER the DB transaction commits successfully.
-     * Releases the Redis lock and broadcasts the "booked" SSE event to all clients.
-     *
-     * Do NOT call this directly — always go through BookingService.book() so that
-     * the lock release is coupled to a successful DB persist.
-     */
-    public void releaseAndBroadcastBooked(String seatId, String userId) {
-        String key = LOCK_PREFIX + seatId;
-        redisTemplate.delete(key);
-        log.info("Lock released post-booking — seat={} user={}", seatId, userId);
-        publishEvent(new SeatLockEvent(seatId, userId, "booked"));
+    public void releaseAndBroadcastBooked(String matchName, String seatId, String userId) {
+        redisTemplate.delete(LOCK_PREFIX + matchName + ":" + seatId);
+        publishEvent(new SeatLockEvent(matchName, seatId, userId, "booked"));
     }
 
-    // ──────────────────────────────────────────────
-    //  Redis Pub/Sub & SSE Broadcasting
-    // ──────────────────────────────────────────────
+    // ── Redis Pub/Sub + SSE ───────────────────────────────────────────────────
 
-    /** Publishes event to Redis so ALL backend instances receive it */
     private void publishEvent(SeatLockEvent event) {
         try {
             String json = objectMapper.writeValueAsString(event);
             redisTemplate.convertAndSend(RedisConfig.SEAT_UPDATES_TOPIC, json);
         } catch (JsonProcessingException e) {
-            e.printStackTrace();
+            log.error("Failed to serialize SSE event", e);
         }
     }
 
-    /** 
-     * Called by RedisMessageListenerContainer when a message arrives on the Pub/Sub topic.
-     * This receives events from ANY backend instance.
-     */
     public void receiveRedisMessage(String message) {
         try {
             SeatLockEvent event = objectMapper.readValue(message, SeatLockEvent.class);
-            // Forward the event to all locally connected browsers
-            broadcastToLocals(event);
+            List<SseEmitter> emitters = matchEmitters.get(event.getMatchName());
+            if (emitters != null) {
+                emitters.forEach(emitter -> sendToEmitter(event, emitter));
+            }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Failed to deserialize Redis message: {}", message, e);
         }
-    }
-
-    private void broadcastToLocals(SeatLockEvent event) {
-        localEmitters.forEach(emitter -> sendToEmitter(event, emitter));
     }
 
     private void sendToEmitter(SeatLockEvent event, SseEmitter emitter) {
         try {
             String json = objectMapper.writeValueAsString(event);
-            emitter.send(SseEmitter.event()
-                    .name("seat-update")
-                    .data(json));
+            emitter.send(SseEmitter.event().name("seat-update").data(json));
         } catch (IOException e) {
             emitter.completeWithError(e);
-            localEmitters.remove(emitter);
+            // Removal handled by callbacks
         }
     }
 }

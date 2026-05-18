@@ -1,0 +1,35 @@
+<div class="matches-container">
+  <header class="matches-header">
+    <div class="logo">🏟️ StadiumX</div>
+    <h1>Premier League Tickets</h1>
+    <p>Select a match to book your seats in real-time.</p>
+  </header>
+
+  <div class="loading-state" *ngIf="loading">
+    <div class="spinner"></div>
+    <p>Loading schedule...</p>
+  </div>
+
+  <div class="matches-grid" *ngIf="!loading">
+    <div class="match-card" *ngFor="let match of matches" [routerLink]="['/stadium', match.id]">
+      <div class="card-glow"></div>
+      <div class="match-date">
+        <span class="date-icon">📅</span> {{ match.date }}
+      </div>
+      
+      <div class="teams">
+        <div class="team">{{ match.team1 }}</div>
+        <div class="vs">VS</div>
+        <div class="team">{{ match.team2 }}</div>
+      </div>
+      
+      <div class="venue">
+        <span class="venue-icon">📍</span> {{ match.venue }}
+      </div>
+      
+      <div class="card-footer">
+        <button class="book-btn">Book Tickets</button>
+      </div>
+    </div>
+  </div>
+</div>

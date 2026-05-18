@@ -22,7 +22,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
      * Used by BookingService to check for an existing booking before persisting.
      * Also used by SeatLockService to verify a seat's current DB state.
      */
-    Optional<Ticket> findBySeat(String seat);
+    Optional<Ticket> findByMatchNameAndSeat(String matchName, String seat);
 
     /**
      * Returns all tickets booked by a specific user.

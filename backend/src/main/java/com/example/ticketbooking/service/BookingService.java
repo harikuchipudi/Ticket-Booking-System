@@ -3,6 +3,8 @@ package com.example.ticketbooking.service;
 import com.example.ticketbooking.model.Ticket;
 import com.example.ticketbooking.model.TicketStatus;
 import com.example.ticketbooking.repository.TicketRepository;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -27,19 +29,29 @@ import org.springframework.transaction.annotation.Transactional;
 public class BookingService {
 
     private static final Logger log = LoggerFactory.getLogger(BookingService.class);
-
     private static final String LOCK_PREFIX = "seat:lock:";
 
     private final TicketRepository    ticketRepository;
     private final SeatLockService     seatLockService;
     private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
 
+    private final Counter bookingConfirmedCounter;
+    private final Counter bookingRejectedCounter;
+
     public BookingService(TicketRepository ticketRepository,
                           SeatLockService seatLockService,
-                          org.springframework.data.redis.core.StringRedisTemplate redisTemplate) {
+                          org.springframework.data.redis.core.StringRedisTemplate redisTemplate,
+                          MeterRegistry meterRegistry) {
         this.ticketRepository = ticketRepository;
         this.seatLockService  = seatLockService;
         this.redisTemplate    = redisTemplate;
+
+        this.bookingConfirmedCounter = Counter.builder("booking.confirmed")
+                .description("Successfully persisted bookings")
+                .register(meterRegistry);
+        this.bookingRejectedCounter  = Counter.builder("booking.rejected")
+                .description("Rejected booking attempts (lock mismatch or duplicate)")
+                .register(meterRegistry);
     }
 
     /**
@@ -56,21 +68,22 @@ public class BookingService {
     public Ticket book(String seatId, String userId, String matchName, String customerName) {
 
         // ── Step 1: Verify the caller owns the Redis lock ─────────────────────
-        String lockKey   = LOCK_PREFIX + seatId;
+        String lockKey   = LOCK_PREFIX + matchName + ":" + seatId;
         String lockOwner = redisTemplate.opsForValue().get(lockKey);
 
         if (!userId.equals(lockOwner)) {
-            log.warn("Booking rejected — user {} does not own lock for seat {}. Lock held by: {}",
-                    userId, seatId, lockOwner);
+            bookingRejectedCounter.increment();
+            log.warn("Booking rejected — user {} does not own lock for match {} seat {}. Lock held by: {}",
+                    userId, matchName, seatId, lockOwner);
             throw new SeatNotLockedException(
                     "You must select (lock) the seat before booking. " +
                     "The lock may have expired or is held by another user.");
         }
 
         // ── Step 2: Guard against double-booking at the DB level ──────────────
-        if (ticketRepository.findBySeat(seatId).isPresent()) {
-            log.warn("Booking rejected — seat {} is already booked in the DB", seatId);
-            throw new SeatAlreadyBookedException("Seat " + seatId + " is already booked.");
+        if (ticketRepository.findByMatchNameAndSeat(matchName, seatId).isPresent()) {
+            log.warn("Booking rejected — seat {} is already booked in the DB for match {}", seatId, matchName);
+            throw new SeatAlreadyBookedException("Seat " + seatId + " is already booked for this match.");
         }
 
         // ── Step 3: Persist the booking to Neon PostgreSQL ────────────────────
@@ -85,17 +98,18 @@ public class BookingService {
         Ticket saved;
         try {
             saved = ticketRepository.save(ticket);
-            log.info("Ticket persisted — seat={} user={} id={}", seatId, userId, saved.getId());
+            bookingConfirmedCounter.increment();
+            log.info("Ticket persisted — match={} seat={} user={} id={}", matchName, seatId, userId, saved.getId());
         } catch (DataIntegrityViolationException ex) {
             // Extremely rare: two requests passed step 2 simultaneously.
-            // The DB UNIQUE constraint on `seat` catches this.
-            log.error("DB unique constraint triggered for seat {} — possible race condition", seatId, ex);
+            // The DB UNIQUE constraint on `seat` + `match_name` catches this.
+            log.error("DB unique constraint triggered for match {} seat {} — possible race condition", matchName, seatId, ex);
             throw new SeatAlreadyBookedException("Seat " + seatId + " was just booked by another user.");
         }
 
         // ── Step 4 & 5: Release Redis lock and broadcast SSE event ────────────
         // These happen AFTER the DB commit succeeds (method is @Transactional).
-        seatLockService.releaseAndBroadcastBooked(seatId, userId);
+        seatLockService.releaseAndBroadcastBooked(matchName, seatId, userId);
 
         return saved;
     }

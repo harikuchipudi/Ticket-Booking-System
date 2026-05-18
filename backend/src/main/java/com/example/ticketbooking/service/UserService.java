@@ -4,6 +4,8 @@ import com.example.ticketbooking.model.AuthResponse;
 import com.example.ticketbooking.model.AuthRequest;
 import com.example.ticketbooking.model.User;
 import com.example.ticketbooking.repository.UserRepository;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -17,18 +19,30 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
-    private static final long TOKEN_EXPIRY_SECONDS = 86_400L; // 24 hours
+    private static final long TOKEN_EXPIRY_SECONDS = 86_400L;
 
     private final UserRepository  userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService      jwtService;
 
+    private final Counter registrationCounter;
+    private final Counter loginSuccessCounter;
+    private final Counter loginFailureCounter;
+
     public UserService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       MeterRegistry meterRegistry) {
         this.userRepository  = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService      = jwtService;
+
+        this.registrationCounter = Counter.builder("auth.registrations")
+                .description("New user registrations").register(meterRegistry);
+        this.loginSuccessCounter  = Counter.builder("auth.logins")
+                .tag("result", "success").register(meterRegistry);
+        this.loginFailureCounter  = Counter.builder("auth.logins")
+                .tag("result", "failure").register(meterRegistry);
     }
 
     @Transactional
@@ -41,7 +55,7 @@ public class UserService {
         User user = new User(req.getEmail(), hash,
                 req.getDisplayName() != null ? req.getDisplayName() : req.getEmail());
         user = userRepository.save(user);
-
+        registrationCounter.increment();
         log.info("User registered — email={} id={}", user.getEmail(), user.getId());
         String token = jwtService.generateToken(user);
         return new AuthResponse(token, user.getId().toString(), user.getDisplayName(), TOKEN_EXPIRY_SECONDS);
@@ -52,9 +66,10 @@ public class UserService {
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
 
         if (!passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
+            loginFailureCounter.increment();
             throw new InvalidCredentialsException("Invalid email or password");
         }
-
+        loginSuccessCounter.increment();
         log.info("User logged in — email={} id={}", user.getEmail(), user.getId());
         String token = jwtService.generateToken(user);
         return new AuthResponse(token, user.getId().toString(), user.getDisplayName(), TOKEN_EXPIRY_SECONDS);

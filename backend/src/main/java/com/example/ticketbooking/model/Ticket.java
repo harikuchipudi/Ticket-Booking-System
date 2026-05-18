@@ -15,8 +15,8 @@ import java.time.Instant;
  */
 @Entity
 @Table(
-    name = "tickets",
-    uniqueConstraints = @UniqueConstraint(name = "uq_ticket_seat", columnNames = "seat")
+    name = "tickets_v2",
+    uniqueConstraints = @UniqueConstraint(name = "uq_ticket_match_seat", columnNames = {"match_name", "seat"})
 )
 public class Ticket {
 
@@ -29,7 +29,7 @@ public class Ticket {
     private String matchName;
 
     /** Seat identifier, e.g. "A1", "B12". Unique across the event. */
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String seat;
 
     /** Display name of the person who booked. */

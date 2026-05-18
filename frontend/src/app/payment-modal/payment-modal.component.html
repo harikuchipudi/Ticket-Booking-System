@@ -1,0 +1,98 @@
+<div class="modal-overlay" (click)="close()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+
+    <!-- ── Step 1: Card Form ─────────────────────────────────────── -->
+    <ng-container *ngIf="step === 'form'">
+
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-icon">💳</span>
+          <h2>Complete Payment</h2>
+        </div>
+        <button class="close-btn" (click)="close()" id="btn-modal-close">✕</button>
+      </div>
+
+      <!-- Seat summary -->
+      <div class="seat-summary">
+        <div class="seat-row" *ngFor="let item of seatsBreakdown">
+          <span class="seat-id">{{ item.id }}</span>
+          <span class="seat-cat">{{ item.category }}</span>
+          <span class="seat-price">₹{{ item.price | number }}</span>
+        </div>
+        <div class="summary-total">
+          <span>Total</span>
+          <span class="total-amount">₹{{ total | number }}</span>
+        </div>
+      </div>
+
+      <!-- Fake card form -->
+      <div class="card-form">
+        <div class="field">
+          <label>Cardholder Name</label>
+          <input type="text" [(ngModel)]="cardholderName" name="cardholderName"
+                 placeholder="Full name on card" id="input-cardholder" />
+        </div>
+        <div class="field">
+          <label>Card Number</label>
+          <div class="card-number-wrap">
+            <input type="text" [value]="cardNumber"
+                   (input)="formatCard($any($event.target).value)"
+                   placeholder="1234 5678 9012 3456" maxlength="19"
+                   id="input-card-number" />
+            <span class="card-icon">💳</span>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Expiry</label>
+            <input type="text" [value]="expiry"
+                   (input)="formatExpiry($any($event.target).value)"
+                   placeholder="MM/YY" maxlength="5" id="input-expiry" />
+          </div>
+          <div class="field">
+            <label>CVV</label>
+            <input type="password" [(ngModel)]="cvv" name="cvv"
+                   placeholder="•••" maxlength="3" id="input-cvv" />
+          </div>
+        </div>
+
+        <p class="mock-notice">🔒 This is a simulated payment — no real card is charged</p>
+
+        <button class="pay-btn" (click)="pay()" id="btn-pay">
+          Pay ₹{{ total | number }}
+        </button>
+      </div>
+
+    </ng-container>
+
+    <!-- ── Step 2: Processing ────────────────────────────────────── -->
+    <ng-container *ngIf="step === 'processing'">
+      <div class="state-screen">
+        <div class="spinner-ring"></div>
+        <h3>Processing Payment…</h3>
+        <p>Please don't close this window</p>
+      </div>
+    </ng-container>
+
+    <!-- ── Step 3: Success ───────────────────────────────────────── -->
+    <ng-container *ngIf="step === 'success'">
+      <div class="state-screen">
+        <div class="success-check">✓</div>
+        <h3>Booking Confirmed!</h3>
+        <p>{{ seats.length }} seat(s) reserved successfully</p>
+        <p class="sub">Your tickets will appear in My Bookings</p>
+      </div>
+    </ng-container>
+
+    <!-- ── Step 4: Error ─────────────────────────────────────────── -->
+    <ng-container *ngIf="step === 'error'">
+      <div class="state-screen">
+        <div class="error-icon">✕</div>
+        <h3>Booking Failed</h3>
+        <p class="error-msg-text">{{ errorMsg }}</p>
+        <button class="retry-btn" (click)="retry()" id="btn-retry">Try Again</button>
+      </div>
+    </ng-container>
+
+  </div>
+</div>

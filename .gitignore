@@ -1,6 +1,10 @@
 # macOS
 .DS_Store
 
+# Secrets — never commit these
+backend/.env
+backend/.env.*
+
 # Node
 frontend/node_modules/
 frontend/dist/

@@ -36,7 +36,6 @@ export class AuthService {
     const token = this.getToken();
     if (token && !this.isTokenExpired(token)) {
       this.fetchMe().subscribe({
-        next: user => this.seatService.connectStream(user.userId),
         error: () => this.clearToken()
       });
     }
@@ -49,17 +48,14 @@ export class AuthService {
       // Step 1: store the JWT
       tap(res => this.storeToken(res.token)),
       // Step 2: verify token by calling /me — gets the full user profile
-      concatMap(() => this.fetchMe()),
-      // Step 3: open SSE stream with the confirmed userId
-      tap(user => this.seatService.connectStream(user.userId))
+      concatMap(() => this.fetchMe())
     );
   }
 
   register(email: string, password: string, displayName: string): Observable<User> {
     return this.http.post<AuthResponse>(`${API}/api/auth/register`, { email, password, displayName } as AuthRequest).pipe(
       tap(res => this.storeToken(res.token)),
-      concatMap(() => this.fetchMe()),
-      tap(user => this.seatService.connectStream(user.userId))
+      concatMap(() => this.fetchMe())
     );
   }
 

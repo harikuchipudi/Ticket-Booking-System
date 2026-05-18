@@ -2,7 +2,9 @@ package com.example.ticketbooking.controller;
 
 import com.example.ticketbooking.model.Ticket;
 import com.example.ticketbooking.service.BookingService;
+import com.example.ticketbooking.service.RateLimiterService;
 import com.example.ticketbooking.service.SeatLockService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,56 +16,64 @@ import java.util.Map;
 /**
  * REST + SSE controller for real-time seat locking and booking.
  *
- * userId is extracted from the validated JWT (@AuthenticationPrincipal),
- * never from the request body — this prevents impersonation.
- *
- * Endpoints:
- *   GET  /api/seats/stream       → SSE (public — EventSource can't set headers)
- *   POST /api/seats/{id}/lock    → acquire distributed Redis lock
- *   POST /api/seats/{id}/unlock  → release lock
- *   POST /api/seats/{id}/book    → atomic persist to Neon + release lock
+ * Security:
+ *   - userId comes from @AuthenticationPrincipal (JWT) — never from the request body
+ *   - lock() is rate-limited to 20 attempts per user per minute (429 if exceeded)
+ *   - Redis circuit breaker on lock/unlock — fails safely (false) rather than throwing
  */
 @RestController
 @RequestMapping("/api/seats")
 public class SeatLockController {
 
-    private final SeatLockService seatLockService;
-    private final BookingService  bookingService;
+    private final SeatLockService   seatLockService;
+    private final BookingService    bookingService;
+    private final RateLimiterService rateLimiterService;
 
-    public SeatLockController(SeatLockService seatLockService, BookingService bookingService) {
-        this.seatLockService = seatLockService;
-        this.bookingService  = bookingService;
+    public SeatLockController(SeatLockService seatLockService,
+                              BookingService bookingService,
+                              RateLimiterService rateLimiterService) {
+        this.seatLockService    = seatLockService;
+        this.bookingService     = bookingService;
+        this.rateLimiterService = rateLimiterService;
     }
 
-    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream() {
-        return seatLockService.subscribe();
+    @GetMapping(value = "/{matchName}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream(@PathVariable String matchName) {
+        return seatLockService.subscribe(matchName);
     }
 
-    @PostMapping("/{seatId}/lock")
+    @PostMapping("/{matchName}/{seatId}/lock")
     public ResponseEntity<Map<String, Object>> lock(
+            @PathVariable String matchName,
             @PathVariable String seatId,
             @AuthenticationPrincipal String userId) {
 
-        boolean success = seatLockService.lock(seatId, userId);
+        if (!rateLimiterService.allowLockAttempt(userId)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("success", false, "reason", "Too many lock attempts. Please wait a moment."));
+        }
+
+        boolean success = seatLockService.lock(matchName, seatId, userId);
         if (success) {
             return ResponseEntity.ok(Map.of("success", true));
         }
-        return ResponseEntity.status(409)
+        return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("success", false, "reason", "Seat already locked by another user"));
     }
 
-    @PostMapping("/{seatId}/unlock")
+    @PostMapping("/{matchName}/{seatId}/unlock")
     public ResponseEntity<Void> unlock(
+            @PathVariable String matchName,
             @PathVariable String seatId,
             @AuthenticationPrincipal String userId) {
 
-        seatLockService.unlock(seatId, userId);
+        seatLockService.unlock(matchName, seatId, userId);
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/{seatId}/book")
+    @PostMapping("/{matchName}/{seatId}/book")
     public ResponseEntity<Object> book(
+            @PathVariable String matchName,
             @PathVariable String seatId,
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal String userId) {
@@ -71,8 +81,8 @@ public class SeatLockController {
         try {
             Ticket saved = bookingService.book(
                     seatId,
-                    userId,  // from JWT — verified identity
-                    body.getOrDefault("matchName", "General Admission"),
+                    userId,
+                    matchName,
                     body.getOrDefault("customerName", userId)
             );
             return ResponseEntity.ok(saved);

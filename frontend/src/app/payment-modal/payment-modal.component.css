@@ -1,0 +1,200 @@
+/* ── Overlay ──────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+.modal-card {
+  width: 420px;
+  background: #0d1526;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 32px 100px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255,255,255,0.04);
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem 0;
+}
+
+.modal-title { display: flex; align-items: center; gap: 0.6rem; }
+.modal-icon  { font-size: 1.4rem; }
+.modal-title h2 { font-size: 1.1rem; font-weight: 700; color: #f1f5f9; margin: 0; }
+
+.close-btn {
+  background: rgba(255,255,255,0.06);
+  border: none;
+  color: rgba(255,255,255,0.5);
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background 0.2s, color 0.2s;
+}
+.close-btn:hover { background: rgba(255,255,255,0.12); color: #f1f5f9; }
+
+/* ── Seat Summary ─────────────────────────────────────────────────────────── */
+.seat-summary {
+  margin: 1rem 1.5rem;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.seat-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 0.85rem;
+}
+
+.seat-id   { font-weight: 700; color: #60a5fa; min-width: 48px; }
+.seat-cat  { flex: 1; color: rgba(255,255,255,0.5); }
+.seat-price{ color: #f1f5f9; font-weight: 600; }
+
+.summary-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.5);
+}
+.total-amount { font-size: 1.1rem; font-weight: 700; color: #34d399; }
+
+/* ── Card Form ────────────────────────────────────────────────────────────── */
+.card-form { padding: 0 1.5rem 1.5rem; display: flex; flex-direction: column; gap: 0.85rem; }
+
+.field { display: flex; flex-direction: column; gap: 0.3rem; }
+.field label { font-size: 0.75rem; color: rgba(255,255,255,0.45); font-weight: 500; letter-spacing: 0.03em; }
+.field input, .card-number-wrap input {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 0.65rem 0.9rem;
+  color: #f1f5f9;
+  font-size: 0.9rem;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.field input:focus, .card-number-wrap input:focus {
+  border-color: rgba(96, 165, 250, 0.5);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.08);
+}
+.field input::placeholder { color: rgba(255,255,255,0.18); }
+
+.card-number-wrap { position: relative; }
+.card-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 1rem; opacity: 0.4; }
+
+.field-row { display: flex; gap: 0.75rem; }
+.field-row .field { flex: 1; }
+
+.mock-notice {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.25);
+  text-align: center;
+  margin: 0;
+}
+
+.pay-btn {
+  padding: 0.85rem;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+  letter-spacing: 0.02em;
+}
+.pay-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+/* ── State Screens (processing / success / error) ─────────────────────────── */
+.state-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  text-align: center;
+  gap: 0.75rem;
+}
+
+.state-screen h3 { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; margin: 0; }
+.state-screen p  { color: rgba(255,255,255,0.45); font-size: 0.875rem; margin: 0; }
+.state-screen .sub { font-size: 0.775rem; color: rgba(255,255,255,0.3); }
+
+/* Spinner */
+.spinner-ring {
+  width: 52px; height: 52px;
+  border: 3px solid rgba(96, 165, 250, 0.15);
+  border-top-color: #60a5fa;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg) } }
+
+/* Success check */
+.success-check {
+  width: 56px; height: 56px;
+  background: rgba(52, 211, 153, 0.15);
+  border: 2px solid #34d399;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  color: #34d399;
+  animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes popIn { from { transform: scale(0) } to { transform: scale(1) } }
+
+/* Error icon */
+.error-icon {
+  width: 56px; height: 56px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 2px solid #ef4444;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  color: #ef4444;
+}
+.error-msg-text { color: #fca5a5 !important; }
+
+.retry-btn {
+  margin-top: 0.5rem;
+  padding: 0.6rem 1.5rem;
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  border-radius: 10px;
+  background: rgba(96, 165, 250, 0.1);
+  color: #60a5fa;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.retry-btn:hover { background: rgba(96, 165, 250, 0.2); }

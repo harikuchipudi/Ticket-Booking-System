@@ -1,6 +1,239 @@
 /* ═══════════════════════════════════════
+   APP SHELL — full-height flex layout
+═══════════════════════════════════════ */
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: #020817;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+/* ── Left sidebar ── */
+.app-left {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+
+/* ── Right main area ── */
+.app-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════
+   TOP BAR
+═══════════════════════════════════════ */
+.topbar {
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  height: 52px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.01);
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.topbar-icon { font-size: 1.3rem; }
+.topbar-name {
+  font-size: 15px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #fff 20%, #86efac 80%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.topbar-center {
+  flex: 1;
+  text-align: center;
+}
+.topbar-event {
+  font-size: 12px;
+  color: #475569;
+  font-weight: 500;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.live-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  font-size: 10px;
+  font-weight: 700;
+  color: #4ade80;
+  letter-spacing: 0.08em;
+}
+
+.live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  animation: livePulse 1.5s ease-in-out infinite;
+}
+@keyframes livePulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(74,222,128,0.4); }
+  50%       { opacity: 0.7; box-shadow: 0 0 0 4px rgba(74,222,128,0); }
+}
+
+.seat-count { font-size: 11px; color: #334155; }
+
+/* ═══════════════════════════════════════
+   STADIUM WRAPPER
+═══════════════════════════════════════ */
+.stadium-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: hidden;
+  gap: 12px;
+}
+
+/* ═══════════════════════════════════════
+   SVG SEATS — use fill, not background
+═══════════════════════════════════════ */
+.seat {
+  cursor: pointer;
+  transition: opacity 0.15s;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.seat:hover { opacity: 0.85; transform: scale(1.7); }
+
+/* Category fill colours */
+.seat.vip      { fill: #fbbf24; filter: drop-shadow(0 0 3px rgba(251,191,36,0.6)); }
+.seat.premium  { fill: #60a5fa; filter: drop-shadow(0 0 3px rgba(96,165,250,0.5)); }
+.seat.standard { fill: #4ade80; filter: drop-shadow(0 0 3px rgba(74,222,128,0.5)); }
+.seat.economy  { fill: #94a3b8; }
+
+/* Status overrides — must come AFTER category */
+.seat.locked {
+  fill: #f97316 !important;
+  filter: drop-shadow(0 0 5px rgba(249,115,22,0.8)) !important;
+  animation: seatPulse 1.4s ease-in-out infinite;
+}
+@keyframes seatPulse {
+  0%, 100% { opacity: 0.9; }
+  50%       { opacity: 1; }
+}
+
+.seat.booked {
+  fill: #dc2626 !important;
+  filter: none !important;
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.seat.booked:hover { transform: scale(1) !important; opacity: 0.45; }
+
+/* ═══════════════════════════════════════
+   LEGEND
+═══════════════════════════════════════ */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 8px 14px;
+}
+
+.legend-sep { width: 1px; height: 14px; background: rgba(255,255,255,0.08); }
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.legend-dot {
+  width: 8px; height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.legend-dot.vip-dot      { background: #fbbf24; }
+.legend-dot.premium-dot  { background: #60a5fa; }
+.legend-dot.standard-dot { background: #4ade80; }
+.legend-dot.economy-dot  { background: #94a3b8; }
+.legend-dot.locked-dot   { background: #f97316; }
+.legend-dot.booked-dot   { background: #dc2626; }
+
+/* ═══════════════════════════════════════
+   BOOKING BAR
+═══════════════════════════════════════ */
+.booking-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 700px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 12px 16px;
+  backdrop-filter: blur(12px);
+  animation: barSlide 0.25s ease-out;
+}
+@keyframes barSlide { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.bar-left { display: flex; flex-direction: column; }
+.bar-count { font-size: 14px; font-weight: 700; color: #f1f5f9; }
+.bar-seats { font-size: 11px; color: #475569; margin-top: 1px; }
+
+.bar-right { display: flex; align-items: center; gap: 14px; }
+.bar-total { font-size: 20px; font-weight: 800; color: #4ade80; }
+
+.book-btn {
+  padding: 10px 22px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #22c55e, #15803d);
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 16px rgba(34,197,94,0.3);
+  white-space: nowrap;
+}
+.book-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(34,197,94,0.45); }
+.book-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* ═══════════════════════════════════════
    PAGE WRAPPER
 ═══════════════════════════════════════ */
+
 .page-wrapper {
   min-height: 100vh;
   background: radial-gradient(ellipse at 30% 0%, #0d1b3e 0%, #020817 50%, #050d1a 100%);

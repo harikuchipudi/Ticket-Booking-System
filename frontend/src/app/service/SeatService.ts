@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Subject, Observable } from 'rxjs';
 
 export interface SeatLockMessage {
+  matchName: string;
   seatId: string;
   userId: string;
   status: 'locked' | 'available' | 'booked';
@@ -22,6 +23,7 @@ const API = 'http://localhost:8082';
 export class SeatService implements OnDestroy {
 
   private _userId: string = '';
+  private _matchName: string = '';
   private eventSource?: EventSource;
   private seatUpdates$ = new Subject<SeatLockMessage>();
 
@@ -31,15 +33,14 @@ export class SeatService implements OnDestroy {
 
   // ── Stream lifecycle ────────────────────────────────────────────────────
 
-  /**
-   * Called by AuthService after successful login/register.
-   * Opens the SSE connection with the verified userId set.
-   */
-  connectStream(userId: string): void {
+  connectStream(matchName: string, userId: string): void {
+    if (this.eventSource && this._matchName === matchName) return;
+
     this._userId = userId;
+    this._matchName = matchName;
     this.disconnectStream(); // close any existing connection
 
-    this.eventSource = new EventSource(`${API}/api/seats/stream`);
+    this.eventSource = new EventSource(`${API}/api/seats/${matchName}/stream`);
 
     this.eventSource.addEventListener('seat-update', (event: MessageEvent) => {
       const update: SeatLockMessage = JSON.parse(event.data);
@@ -49,7 +50,7 @@ export class SeatService implements OnDestroy {
     this.eventSource.onerror = () => {
       // Reconnect after 3 seconds on connection loss
       setTimeout(() => {
-        if (this._userId) this.connectStream(this._userId);
+        if (this._userId && this._matchName) this.connectStream(this._matchName, this._userId);
       }, 3000);
     };
   }
@@ -58,6 +59,7 @@ export class SeatService implements OnDestroy {
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = undefined;
+      this._matchName = '';
     }
   }
 
@@ -65,20 +67,16 @@ export class SeatService implements OnDestroy {
 
   // ── Seat operations ─────────────────────────────────────────────────────
 
-  lockSeat(seatId: string): Observable<any> {
-    return this.http.post(`${API}/api/seats/${seatId}/lock`, {});
+  lockSeat(matchName: string, seatId: string): Observable<any> {
+    return this.http.post(`${API}/api/seats/${matchName}/${seatId}/lock`, {});
   }
 
-  unlockSeat(seatId: string): Observable<any> {
-    return this.http.post(`${API}/api/seats/${seatId}/unlock`, {});
+  unlockSeat(matchName: string, seatId: string): Observable<any> {
+    return this.http.post(`${API}/api/seats/${matchName}/${seatId}/unlock`, {});
   }
 
-  /**
-   * Books seats sequentially using RxJS concat — each seat is booked only
-   * after the previous one completes. Replaces the old Promise.all (parallel).
-   */
-  bookSeat(seatId: string, matchName: string, customerName: string): Observable<any> {
-    return this.http.post(`${API}/api/seats/${seatId}/book`, { matchName, customerName });
+  bookSeat(matchName: string, seatId: string, payload: { customerName: string }): Observable<any> {
+    return this.http.post(`${API}/api/seats/${matchName}/${seatId}/book`, payload);
   }
 
   ngOnDestroy(): void {
