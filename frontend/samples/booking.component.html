@@ -1,0 +1,14 @@
+<div>
+  <h2>Book Ticket</h2>
+  <form (ngSubmit)="submit()">
+    <label>Match: <input [(ngModel)]="model.matchName" name="match" required /></label>
+    <label>Seat: <input [(ngModel)]="model.seat" name="seat" required /></label>
+    <label>Name: <input [(ngModel)]="model.customerName" name="customerName" required /></label>
+    <button type="submit">Book</button>
+  </form>
+
+  <h3>Booked Tickets</h3>
+  <ul>
+    <li *ngFor="let t of tickets">{{t.id}} - {{t.matchName}} - {{t.seat}} - {{t.customerName}}</li>
+  </ul>
+</div>

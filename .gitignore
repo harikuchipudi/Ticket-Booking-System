@@ -1,0 +1,52 @@
+# macOS
+.DS_Store
+
+# Node
+frontend/node_modules/
+frontend/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+/.env
+/.env.local
+
+# Angular cache
+frontend/.angular/cache/
+frontend/.angular/
+
+# Logs
+logs/
+*.log
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+
+# Java / Maven
+backend/target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven wrapper files
+/.mvn/
+
+# Build outputs
+dist/
+build/
+
+# Coverage
+coverage/
+
+# Editor swap files
+*.swp
+*~
+
+# Temporary files
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo

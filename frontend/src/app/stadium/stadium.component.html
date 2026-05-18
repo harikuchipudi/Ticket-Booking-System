@@ -1,0 +1,140 @@
+<div class="page-wrapper">
+
+  <header class="page-header">
+    <div class="header-glow"></div>
+    <div class="header-icon">🏟️</div>
+    <div class="header-text">
+      <h1>Cricket Stadium</h1>
+      <p>Select your seats and enjoy the match</p>
+    </div>
+  </header>
+
+  <div class="main-layout">
+
+    <!-- Stadium Arena -->
+    <div class="arena-wrapper">
+
+      <!-- Legend -->
+      <div class="legend">
+        <div class="legend-item">
+          <span class="legend-dot vip-dot"></span><span>VIP — ₹5,000</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot premium-dot"></span><span>Premium — ₹3,000</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot standard-dot"></span><span>Standard — ₹1,500</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot economy-dot"></span><span>Economy — ₹800</span>
+        </div>
+        <div class="legend-sep"></div>
+        <div class="legend-item">
+          <span class="legend-dot booked-dot"></span><span>Booked</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot selected-dot"></span><span>Selected</span>
+        </div>
+      </div>
+
+      <!-- Stadium Bowl -->
+      <div class="stadium">
+
+        <!-- Segment Rings -->
+        <div
+          *ngFor="let ring of segmentRings; let i = index"
+          class="segment-ring"
+          [style.width.px]="ring.diameter"
+          [style.height.px]="ring.diameter"
+          [style.borderColor]="ring.color"
+        >
+          <!-- Label at top of each ring -->
+          <span class="segment-label" [ngClass]="'label-' + i">{{ ring.label }}</span>
+        </div>
+
+        <!-- Pitch -->
+        <div class="pitch">
+          <div class="pitch-stripe"></div>
+          <div class="pitch-inner">
+            <span class="pitch-icon">🏏</span>
+            <span class="pitch-label">PITCH</span>
+          </div>
+        </div>
+
+        <!-- Seats -->
+        <div
+          *ngFor="let seat of seats"
+          class="seat"
+          [ngClass]="[seat.category.toLowerCase(), seat.status]"
+          [style.left.px]="seat.x"
+          [style.top.px]="seat.y"
+          (click)="selectSeat(seat)"
+          [title]="seat.id + ' · ' + seat.category + ' · ₹' + pricing[seat.category]"
+        ></div>
+
+      </div>
+    </div>
+
+    <!-- Side Panel -->
+    <aside class="panel">
+
+      <div class="panel-header">
+        <span class="panel-icon">🎟️</span>
+        <div>
+          <h2>Your Booking</h2>
+          <p class="panel-subtitle">Live seat selection</p>
+        </div>
+      </div>
+
+      <div class="seat-count-badge" [class.active]="selectedSeats.length > 0">
+        <span class="badge-dot" [class.pulse]="selectedSeats.length > 0"></span>
+        {{ selectedSeats.length }} seat{{ selectedSeats.length !== 1 ? 's' : '' }} selected
+      </div>
+
+      <!-- Empty state -->
+      <div class="empty-state" *ngIf="selectedSeats.length === 0">
+        <div class="empty-icon-wrap">
+          <span class="empty-icon">👆</span>
+        </div>
+        <p>Tap any available seat on the<br>stadium map to select it</p>
+      </div>
+
+      <!-- Selected seats list -->
+      <div class="seats-list" *ngIf="selectedSeats.length > 0">
+        <div class="seat-item" *ngFor="let seat of selectedSeats; let idx = index"
+             [style.animationDelay.ms]="idx * 50">
+          <div class="seat-item-left">
+            <span class="seat-color-dot" [ngClass]="seat.category.toLowerCase()"></span>
+            <div>
+              <span class="seat-id">{{ seat.id }}</span>
+              <span class="seat-cat">{{ seat.category }}</span>
+            </div>
+          </div>
+          <span class="seat-price">₹{{ pricing[seat.category] | number }}</span>
+        </div>
+      </div>
+
+      <!-- Total & Button -->
+      <div class="panel-footer" *ngIf="selectedSeats.length > 0">
+        <div class="divider"></div>
+        <div class="total-row">
+          <span class="total-label">Total</span>
+          <span class="total-amount">₹{{ total | number }}</span>
+        </div>
+        <button class="confirm-btn" (click)="bookSeats()">
+          ✅ Confirm Booking
+        </button>
+      </div>
+
+      <button
+        class="confirm-btn disabled"
+        *ngIf="selectedSeats.length === 0"
+        disabled
+      >
+        Select seats to continue
+      </button>
+
+    </aside>
+
+  </div>
+</div>

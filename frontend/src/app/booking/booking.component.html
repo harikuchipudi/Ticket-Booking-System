@@ -1,0 +1,39 @@
+<div class="booking-panel">
+
+  <!-- User header -->
+  <div class="user-header" *ngIf="user">
+    <div class="avatar">{{ user.displayName[0] | uppercase }}</div>
+    <div class="user-info">
+      <div class="user-name">{{ user.displayName }}</div>
+      <div class="user-email">{{ user.email }}</div>
+    </div>
+    <button class="logout-btn" (click)="logout()" id="btn-logout" title="Sign out">↩</button>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- My Bookings -->
+  <div class="section-header">
+    <span class="section-icon">🎫</span>
+    <h2>My Bookings</h2>
+    <button class="refresh-btn" (click)="loadTickets()" title="Refresh">↻</button>
+  </div>
+
+  <div class="tickets-list" *ngIf="tickets.length > 0">
+    <div class="ticket-card" *ngFor="let t of tickets">
+      <div class="ticket-seat">{{ t.seat }}</div>
+      <div class="ticket-details">
+        <div class="ticket-match">{{ t.matchName }}</div>
+        <div class="ticket-meta">{{ t.customerName }}</div>
+      </div>
+      <span class="ticket-status">✓</span>
+    </div>
+  </div>
+
+  <div class="empty-state" *ngIf="tickets.length === 0">
+    <div class="empty-icon">🏟️</div>
+    <p>No bookings yet</p>
+    <span>Select seats from the stadium map →</span>
+  </div>
+
+</div>

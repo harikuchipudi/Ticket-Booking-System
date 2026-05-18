@@ -1,0 +1,50 @@
+<div class="auth-page">
+  <div class="auth-card">
+
+    <div class="brand">
+      <div class="brand-icon">🏟️</div>
+      <h1>StadiumPass</h1>
+      <p class="brand-sub">Book your seat in seconds</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab" [class.active]="mode === 'login'"    (click)="switchMode('login')"   id="tab-login">Sign In</button>
+      <button class="tab" [class.active]="mode === 'register'" (click)="switchMode('register')" id="tab-register">Create Account</button>
+    </div>
+
+    <form class="auth-form" (ngSubmit)="submit()" #f="ngForm">
+
+      <div class="field" *ngIf="mode === 'register'">
+        <label for="displayName">Full Name</label>
+        <input id="displayName" type="text" [(ngModel)]="displayName"
+               name="displayName" placeholder="Your display name" required />
+      </div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" [(ngModel)]="email"
+               name="email" placeholder="you@example.com" required />
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" type="password" [(ngModel)]="password"
+               name="password" placeholder="••••••••" required minlength="6" />
+      </div>
+
+      <div class="error-msg" *ngIf="errorMsg">{{ errorMsg }}</div>
+
+      <button type="submit" class="submit-btn" [disabled]="loading" id="btn-submit">
+        <span *ngIf="!loading">{{ mode === 'login' ? '🔐 Sign In' : '🚀 Create Account' }}</span>
+        <span *ngIf="loading" class="spinner">●</span>
+      </button>
+
+    </form>
+
+    <p class="hint">
+      <span *ngIf="mode === 'login'">New here? <a (click)="switchMode('register')">Create an account</a></span>
+      <span *ngIf="mode === 'register'">Already have an account? <a (click)="switchMode('login')">Sign in</a></span>
+    </p>
+
+  </div>
+</div>
