@@ -1,12 +1,12 @@
 # System Design & Architecture Master Guide
 
-This document presents a comprehensive, high-fidelity system design architecture for the Ticket Booking System, specifically tailored for a **System Design Interview**. It details how the platform addresses high concurrency, data consistency, eventual consistency, rate limiting, and real-time event broadcasting at scale.
+This document presents a comprehensive, high-fidelity system design architecture for the Ticket Booking System. It details how the platform addresses high concurrency, data consistency, eventual consistency, rate limiting, and real-time event broadcasting at scale.
 
 ---
 
 ## 🏗️ System Design Architecture Diagram
 
-This component diagram models a highly scalable, multi-tier deployment of your system, illustrating how traffic flows through the API boundaries, distributed caches, transactional relational databases, and asynchronous event workers.
+This component diagram models a highly scalable, multi-tier deployment of the system, illustrating how traffic flows through the API boundaries, distributed caches, transactional relational databases, and asynchronous event workers.
 
 ```mermaid
 graph TD
@@ -121,7 +121,7 @@ graph TD
 
 ## 🧠 System Design Trade-Offs & Key Architectures
 
-Use this technical reference to showcase your deep system design knowledge during your interview:
+The following sections analyze the system's key architectural mechanisms and engineering trade-offs:
 
 ### 1. High Concurrency & Preventing Double-Booking (Multi-Tier Defense)
 When thousands of users try to book the same stadium seat simultaneously, the system uses a **multi-tier concurrency defense** to guarantee data consistency:
@@ -147,15 +147,15 @@ When thousands of users try to book the same stadium seat simultaneously, the sy
 
 ---
 
-## 🎤 System Design Talking Points: Scaling to 1,000,000 Users
+## 📈 Scalability Plan: Scaling to 1,000,000 Users
 
-If the interviewer asks: **"How would you scale this architecture to support a high-volume concert booking with 1,000,000 concurrent users?"**
+To scale this architecture to support high-volume events with 1,000,000 concurrent users, the system adopts the following distributed strategies:
 
 1. **Redis Clustering & Partitioning**:
-   * *Talking Point*: *"Currently, we use a single Redis instance. To scale to a million users, we would partition our distributed locks across a **Redis Cluster** using the `{matchName}` as a hash tag (e.g. `{match-a}:seat:lock`). This ensures all locks for a single match reside on the same Redis shard, keeping operations atomic while scaling out memory and throughput across shards."*
+   * Currently, the system uses a single Redis instance. To scale to a million users, distributed locks are partitioned across a **Redis Cluster** using the `{matchName}` as a hash tag (e.g. `{match-a}:seat:lock`). This ensures all locks for a single match reside on the same Redis shard, keeping operations atomic while scaling out memory and throughput across shards.
 2. **PostgreSQL Read Replicas & Connection Pooling**:
-   * *Talking Point*: *"For database scaling, our writes are protected by ACID boundaries, but our read volume (fetching seat statuses) is extremely high. We would offload read traffic by deploying **PostgreSQL Read Replicas** and using a pool manager like **PgBouncer** to handle thousands of open database connections efficiently without exhausting database process memory."*
+   * For database scaling, writes are protected by ACID boundaries, but the read volume (fetching seat statuses) is extremely high. Read traffic is offloaded by deploying **PostgreSQL Read Replicas** and using a pool manager like **PgBouncer** to handle thousands of open database connections efficiently without exhausting database process memory.
 3. **Horizontal Scaling of Compute Nodes**:
-   * *Talking Point*: *"Since our application nodes are fully stateless (session states are stored in JWTs), we can horizontally scale out our Spring Boot nodes behind an **Application Load Balancer (ALB)**. If one node fails, the ALB routes traffic to healthy nodes seamlessly without dropping active user logins."*
+   * Since application nodes are fully stateless (session states are stored in JWTs), Spring Boot nodes can be horizontally scaled out behind an **Application Load Balancer (ALB)**. If one node fails, the ALB routes traffic to healthy nodes seamlessly without dropping active user logins.
 4. **Message Broker Integration for the Outbox Pattern**:
-   * *Talking Point*: *"Currently, the `OutboxProcessor` polls the database every second. Under extreme scale, database polling creates overhead. We would transition this to a log-tailed outbox processor using tools like **Debezium** to stream PostgreSQL transaction logs (WAL) directly into a high-throughput message broker like **Apache Kafka**. Kafka would then trigger our cache invalidation and SSE broadcast services asynchronously."*
+   * Currently, the `OutboxProcessor` polls the database every second. Under extreme scale, database polling creates overhead. The system transitions this to a log-tailed outbox processor using tools like **Debezium** to stream PostgreSQL transaction logs (WAL) directly into a high-throughput message broker like **Apache Kafka**. Kafka then triggers cache invalidation and SSE broadcast services asynchronously.

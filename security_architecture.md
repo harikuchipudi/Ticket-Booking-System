@@ -1,12 +1,12 @@
 # Spring Security Architecture & Component Guide
 
-This master reference guide covers the security architecture of your Spring Boot backend. It includes a high-level summary, diagrams, and detailed breakdowns of request parsing, authentication, and authorization.
+This master reference guide covers the security architecture of the Spring Boot backend. It includes a high-level summary, structural diagrams, and detailed breakdowns of request parsing, authentication, and authorization.
 
 ---
 
 ## ⚡ High-Level Summary: The Request Lifecycle in 3 Simple Steps
 
-If you need a quick 30-second cheat sheet for your interview, here is the high-level, phase-wise flow of every single secure request:
+Here is the high-level, phase-wise flow of every secure request:
 
 ```
 [Phase 1: ENTRY & PARSING] ──> [Phase 2: AUTHENTICATION] ──> [Phase 3: AUTHORIZATION] ──> [CONTROLLER]
@@ -20,9 +20,9 @@ If you need a quick 30-second cheat sheet for your interview, here is the high-l
    * A custom security filter (`JwtAuthFilter`) intercepts the parsed request and extracts the JSON Web Token (JWT) from the HTTP `Authorization` header.
    * The server cryptographically validates the token's signature. If valid and not expired, the user's verified identity (`userId`) is stored in Spring's secure thread-local memory (`SecurityContextHolder`).
 3. **Phase 3: Authorization (What are you allowed to do?)**
-   * Spring Security checks the requested URL path against your configured security rules.
+   * Spring Security checks the requested URL path against configured security rules.
    * If it is a public path (like viewing matches or logging in), it is let through immediately.
-   * If it is a protected path (like locking or booking seats), Spring checks its secure memory. If the verified identity from Phase 2 is present, it grants access and hands the request over to your Controller to securely execute the business logic.
+   * If it is a protected path (like locking or booking seats), Spring checks its secure memory. If the verified identity from Phase 2 is present, it grants access and hands the request over to the Controller to execute the business logic.
 
 ---
 
@@ -351,7 +351,7 @@ Authorization is the process of deciding *if* the authenticated user has permiss
 
 ## 💡 Breakdown of Major Spring Security Beans & Services
 
-Use these highly concise technical bullet points to explain the exact responsibility of each component during your interview:
+The following details the exact responsibility of each component in the system:
 
 ### 1. The Beans (Defined in `SecurityConfig.java`)
 * **`SecurityFilterChain filterChain(HttpSecurity http)`**:
@@ -368,19 +368,3 @@ Use these highly concise technical bullet points to explain the exact responsibi
   - The cryptographic token engine. Using the JJWT library (`io.jsonwebtoken`), it generates signed tokens with claims (UUID, email, name) signed via **HMAC-SHA256** using an environment-injected base64-encoded secret key, and parses/verifies incoming tokens.
 * **`UserService`**:
   - The business-logic link between authentication and storage. Operates on raw credentials, compares hashes using the `PasswordEncoder` bean, handles user registration, and powers the secure `/api/auth/me` endpoint.
-
----
-
-## 🎓 Recommended Interview Explanatory Script
-
-If the interviewer asks: **"Can you explain the Spring Security design in your project?"**
-
-> *"Spring Security is configured using a **fully stateless architecture**, where sessions are not created, and CSRF is disabled since state is maintained purely via Bearer tokens in headers.*
->
-> *Our main configuration class is `SecurityConfig.java`, which defines three critical beans: the `SecurityFilterChain` establishing endpoint authorization rules, the `CorsConfigurationSource` establishing whitelisted CORS scopes, and the `BCryptPasswordEncoder` bean which secures user passwords in PostgreSQL.*
->
-> *When an HTTP request is parsed from TCP packets into an HttpServletRequest by Tomcat, it flows through the security filters. Our custom `JwtAuthFilter` intercepts the request, extracts the JWT, and calls our `JwtService` to verify its cryptographic signature and check expiration.*
->
-> *If valid, the filter extracts the user's UUID and creates an authentication token in Spring's thread-local `SecurityContextHolder`. Downstream, the `AuthorizationFilter` permits anonymous matching routes while blocking access to secure endpoints unless a valid security context exists.*
->
-> *Because authentication status resides in the Security Context, our REST endpoints use Spring Security's `@AuthenticationPrincipal` annotation to seamlessly resolve the verified User ID. This prevents parameter manipulation or hijacking since we never trust user identities provided in the HTTP request body."*
