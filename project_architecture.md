@@ -4,6 +4,41 @@ This document presents a comprehensive, high-fidelity system design architecture
 
 ---
 
+## ⚡ High-Level User Journey & Periodic Operations
+
+This chronological breakdown details exactly what happens when an authenticated user enters the website, attempts to reserve a seat, and how background tasks operate on a minute-by-minute basis.
+
+### 1. User Entrance & Real-Time Sync (T = 0 seconds)
+1. **Credentials Retrieval**: The user navigates to the application. The Angular front-end fetches the JWT from the browser's `localStorage` (`ticket_jwt`).
+2. **Session Verification**: The `JwtInterceptor` intercepts an automatic call to `GET /api/auth/me`. If the server validates the token, the UI logs the user in automatically.
+3. **SSE Connection Setup**: Once logged in, Angular immediately establishes a secure Server-Sent Events (SSE) stream via a browser `EventSource` connecting to `GET /api/seats/{matchName}/stream`. The client is now registered as an active viewer.
+4. **Layout Render**: The client fetches the current matches list. Clicking a match loads the dynamic stadium seating layout (`StadiumComponent`), reflecting real-time locked or booked seat classes.
+
+### 2. Selecting & Locking a Seat (Action Phase)
+1. **Lock Request**: The user clicks on an available seat (e.g., "A1"). Angular dispatches a `POST /api/seats/{matchName}/A1/lock`.
+2. **Rate Limit Evaluation**: The Spring Boot backend intercepts the call. `RateLimiterService` increments the user's thread-safe counter. If the user has made $\le$ 20 lock requests in the current minute, the request is approved.
+3. **Acquiring Caching Lock**: `SeatLockService` requests a Redis lock using `SET seat:lock:{matchName}:A1 {userId} NX EX 600`.
+   * **`NX`**: Ensures the lock is only created if the key does not already exist (guarantees mutual exclusion).
+   * **`EX 600`**: Sets a strict Time to Live (TTL) of **10 minutes** (600 seconds).
+4. **SSE Event Broadcast**: Once the lock is acquired, the backend publishes a seat lock event. The SSE broadcaster sends a JSON update (`seatId: A1, status: locked`) to all active stream clients, turning seat A1 yellow on everyone's screen in real-time.
+
+### 3. What Happens Every Minute (Periodic System Execution)
+The system relies on background tasks and automated expirations to maintain security and consistency under high concurrency. Here is what happens minute-by-minute:
+
+* **Every 60 Seconds: Rate Limiter Counter Reset**
+  * **Mechanism**: On the Spring Boot backend, a scheduled worker executes the `@Scheduled(fixedRate = 60_000)` annotation inside `RateLimiterService.resetCounters()`.
+  * **Action**: The JVM completely clears the `ConcurrentHashMap` containing user lock-attempt metrics. Every user's sliding lock quota is reset back to 0, ensuring they are permitted a fresh limit of 20 lock attempts for the next minute.
+* **Minute 1 through 10: Temporary Lock Decriment**
+  * **Mechanism**: Redis naturally decrements the lock's Time to Live (TTL) key by 60 seconds every minute (`TTL seat:lock:{matchName}:A1`).
+  * **Consequence of Expiry (Timeout)**:
+    * If the user closes their browser or fails to complete checkout within **10 minutes**, the Redis key automatically expires and is deleted.
+    * The next time a background polling loop or SSE event fires, or if the user finally attempts to click "Book", the backend realizes the lock ownership check (`userId.equals(lockOwner)`) is false. The booking is rejected, and the seat is released back to the general pool for other buyers.
+* **Every 1 Second: Asynchronous Event Resolution**
+  * **Mechanism**: The backend's `OutboxProcessor` runs on a tight background loop via `@Scheduled(fixedDelay = 1000)`.
+  * **Action**: It polls the database `OutboxEvent` table for committed seat bookings, asynchronously clearing corresponding Redis locks, refreshing layout caches, and broadcasting seat reservations to the client stream.
+
+---
+
 ## 🏗️ System Design Architecture Diagram
 
 This component diagram models a highly scalable, multi-tier deployment of the system, illustrating how traffic flows through the API boundaries, distributed caches, transactional relational databases, and asynchronous event workers.
