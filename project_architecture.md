@@ -1,6 +1,104 @@
 # System Design & Architecture Master Guide
 
-This document presents a comprehensive, high-fidelity system design architecture for the Ticket Booking System. It details how the platform addresses high concurrency, data consistency, eventual consistency, rate limiting, and real-time event broadcasting at scale.
+This document presents a comprehensive, high-fidelity system design architecture for the Ticket Booking System. It details how the platform addresses high concurrency, data consistency, eventual consistency, rate limiting, and real-time event broadcasting at scale, along with its physical infrastructure and deployment topology.
+
+---
+
+## 🌐 Infrastructure & Deployment Topology
+
+This section details the physical layout of the system across both the local development workspace and the live cloud production environment.
+
+### 1. Local Development Topology (Docker & Local JVM)
+In the local development environment, the system utilizes local execution runtime instances alongside Docker containers to isolate infrastructure services:
+
+```mermaid
+graph TD
+    classDef devInstance fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
+    classDef dockerCont fill:#e1f5fe,stroke:#0288d1,stroke-dasharray: 5 5,stroke-width:2px;
+    classDef cloud fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
+    classDef localHost fill:#eceff1,stroke:#37474f,stroke-width:2px;
+
+    subgraph DeveloperMachine ["Developer Local Workstation (localhost)"]
+        direction TB
+        AngularLocal["Angular Frontend Server <br/> (Node.js / Vite - Port 4200)"]:::devInstance
+        SpringBootLocal["Spring Boot Application <br/> (JVM / JDK 17 - Port 8080)"]:::devInstance
+
+        subgraph DockerEngine ["Docker Desktop Engine"]
+            RedisDocker["Redis Container <br/> (Image: redis:7-alpine - Port 6379)"]:::dockerCont
+        end
+
+        AngularLocal -->|"HTTP Rest Mappings / Local SSE"| SpringBootLocal
+        SpringBootLocal -->|"Localhost Socket (6379)"| RedisDocker
+    end
+
+    subgraph ExternalCloud ["External Cloud Tier"]
+        PostgresNeon["Neon Serverless PostgreSQL <br/> (Hosted Remote DB - Port 5432)"]:::cloud
+    end
+
+    SpringBootLocal -->|"JDBC Connection (Remote TLS)"| PostgresNeon
+
+    class AngularLocal,SpringBootLocal devInstance;
+    class RedisDocker dockerCont;
+    class PostgresNeon cloud;
+```
+
+---
+
+### 2. Cloud Production Deployment Topology (PaaS/SaaS Serverless Architecture)
+In production, the application is deployed using a decoupled, serverless and containerized architecture across multiple dedicated cloud providers to maximize scalability and cost-efficiency:
+
+```mermaid
+graph TD
+    classDef client fill:#eceff1,stroke:#37474f,stroke-width:2px;
+    classDef frontend fill:#fff3e0,stroke:#f57c00,stroke-width:2px;
+    classDef backend fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
+    classDef serverless fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
+    classDef upstash fill:#ffebee,stroke:#c62828,stroke-width:2px;
+
+    %% User Client
+    UserBrowser["User Web Browser <br/> (Client Client Node)"]:::client
+
+    %% Frontend Hosting
+    subgraph VercelHost ["Frontend Tier (Vercel Edge Platform)"]
+        direction TB
+        VercelCDN["Vercel Global Edge CDN <br/> (Distributed Asset Caching)"]:::frontend
+        AngularProd["Angular Production Bundle <br/> (Static SPA Compilation)"]:::frontend
+        
+        VercelCDN --> AngularProd
+    end
+
+    %% Backend Hosting
+    subgraph RenderHost ["Compute Tier (Render Container Platform)"]
+        direction TB
+        RenderLoadBalancer["Render HTTP Load Balancer <br/> (SSL Termination & Forwarding)"]:::backend
+        SpringBootDocker["Spring Boot Application Node <br/> (Dockerized Linux Container)"]:::backend
+        
+        RenderLoadBalancer --> SpringBootDocker
+    end
+
+    %% Database Tier
+    subgraph NeonHost ["Data Persistence Tier (Neon Database)"]
+        NeonPostgres[("Neon Serverless PostgreSQL <br/> (Autoscaling ACID Storage)")]:::serverless
+    end
+
+    %% Redis Cache Tier
+    subgraph UpstashHost ["Cache & Lock Tier (Upstash Serverless)"]
+        UpstashRedis[("Upstash Serverless Redis <br/> (HTTP/TCP Lock Cache)")]:::upstash
+    end
+
+    %% Network Connections
+    UserBrowser -->|"1. Secure Static Assets Fetch (HTTPS)"| VercelCDN
+    UserBrowser -->|"2. Secure REST APIs & Real-time SSE Streams"| RenderLoadBalancer
+    
+    SpringBootDocker -->|"3. Serverless Redis Mappings"| UpstashRedis
+    SpringBootDocker -->|"4. TLS Database Mappings (JDBC)"| NeonPostgres
+
+    class UserBrowser client;
+    class VercelCDN,AngularProd frontend;
+    class RenderLoadBalancer,SpringBootDocker backend;
+    class NeonPostgres serverless;
+    class UpstashRedis upstash;
+```
 
 ---
 
